@@ -1,0 +1,5 @@
+{
+  "name": "cursor-report",
+  "install": "pip3 install -r requirements.txt",
+  "start": "python3 -m report.generate_report --no-email"
+}

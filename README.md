@@ -7,6 +7,7 @@ Automação para gerar e enviar por e-mail um relatório semanal de uso do Curso
 - Gráfico de **uso diário em valor** (últimos 30 dias)
 - Gráfico de **uso diário em tokens** (últimos 30 dias)
 - **Total do mês corrente** em USD comparado ao **limite contratado**
+- Arquivo tabular **cursor_activity.csv** (pronto para importação no Google Docs / Planilhas)
 - Relatório versionado em `reports/` (pasta `latest/` e histórico por data)
 - Envio automático por e-mail com os gráficos embutidos
 
@@ -46,7 +47,7 @@ Para gerar apenas os gráficos, sem enviar e-mail:
 python -m report.generate_report --no-email
 ```
 
-Os gráficos são salvos em `output/` e publicados em `reports/latest/`.
+Os gráficos e o arquivo `cursor_activity.csv` são salvos em `output/` e publicados em `reports/latest/`.
 
 ## Automação
 

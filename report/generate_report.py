@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import shutil
@@ -91,6 +92,56 @@ def build_html_summary(
     """
 
 
+def build_activity_csv_rows(
+    *,
+    daily_spend: dict[date, float],
+    daily_tokens: dict[date, int],
+    start: date,
+    end: date,
+    month_start_date: date,
+    month_total: float,
+    month_tokens: int,
+    contracted_limit: float,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    current = start
+    while current <= end:
+        rows.append(
+            {
+                "data": current.isoformat(),
+                "gasto_diario_usd": round(daily_spend.get(current, 0.0), 4),
+                "tokens_diario": daily_tokens.get(current, 0),
+                "mes_corrente": month_start_date.strftime("%Y-%m"),
+                "total_mes_corrente_usd": round(month_total, 2),
+                "tokens_mes_corrente": month_tokens,
+                "limite_contratado_usd": round(contracted_limit, 2),
+            }
+        )
+        current = current.fromordinal(current.toordinal() + 1)
+    return rows
+
+
+def write_activity_csv(
+    rows: list[dict[str, Any]],
+    output_path: Path,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "data",
+        "gasto_diario_usd",
+        "tokens_diario",
+        "mes_corrente",
+        "total_mes_corrente_usd",
+        "tokens_mes_corrente",
+        "limite_contratado_usd",
+    ]
+    with output_path.open("w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return output_path
+
+
 def build_markdown_report(
     *,
     period_start: date,
@@ -128,6 +179,7 @@ def build_markdown_report(
 | Saldo restante | ${_usd(remaining)} |
 | Média diária (30 dias) | ${_usd(daily_average)} |
 | Membros no time | {total_members} |
+| Dados tabulares | [cursor_activity.csv](cursor_activity.csv) |
 
 ## Gráficos
 
@@ -151,6 +203,7 @@ def write_repo_report(
     summary: dict,
     charts: dict[str, Path],
     markdown: str,
+    activity_csv_rows: list[dict[str, Any]] | None = None,
 ) -> Path:
     dated_dir = REPORTS_DIR / report_date.isoformat()
     latest_dir = REPORTS_DIR / "latest"
@@ -164,6 +217,8 @@ def write_repo_report(
             json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
+        if activity_csv_rows is not None:
+            write_activity_csv(activity_csv_rows, target / "cursor_activity.csv")
 
     return latest_dir
 
@@ -219,6 +274,18 @@ def generate_report(send_email: bool = True) -> dict:
         "monthly_limit.png": monthly_chart,
     }
 
+    activity_csv_rows = build_activity_csv_rows(
+        daily_spend=daily_spend,
+        daily_tokens=daily_tokens,
+        start=period_start,
+        end=period_end,
+        month_start_date=month_start_date,
+        month_total=month_total,
+        month_tokens=month_tokens,
+        contracted_limit=contracted_limit,
+    )
+    write_activity_csv(activity_csv_rows, OUTPUT_DIR / "cursor_activity.csv")
+
     summary = {
         "generated_at": generated_at.isoformat(),
         "period_start": period_start.isoformat(),
@@ -231,6 +298,7 @@ def generate_report(send_email: bool = True) -> dict:
         "daily_average_usd": round(daily_average, 2),
         "total_members": spend_data.get("totalMembers", 0),
         "charts": list(charts.keys()),
+        "activity_csv": "cursor_activity.csv",
     }
 
     markdown = build_markdown_report(
@@ -250,6 +318,7 @@ def generate_report(send_email: bool = True) -> dict:
         summary=summary,
         charts=charts,
         markdown=markdown,
+        activity_csv_rows=activity_csv_rows,
     )
     summary["repo_path"] = str(repo_path)
 
